@@ -1,1 +1,4 @@
 .aider*
+go.sum
+go.mod
+main
