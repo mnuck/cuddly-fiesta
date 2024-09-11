@@ -131,6 +131,7 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 		// Check if disk usage is over 85%
 		if len(resp.Series) > 0 && len(resp.Series[0].Pointlist) > 0 {
 			latestPoint := resp.Series[0].Pointlist[len(resp.Series[0].Pointlist)-1]
+			fmt.Printf("%v %v\n", *instance.Ec2InstanceId, *latestPoint[1])
 			if *latestPoint[1] > 0.85 {
 				highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
 			}
