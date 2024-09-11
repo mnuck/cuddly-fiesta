@@ -114,13 +114,11 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 					break
 				}
 			}
-			fmt.Printf("Host tags: %v\n", hostTags)
 			if *latestPoint[1] > 0.85 {
 				highDiskUsageHosts = append(highDiskUsageHosts, hostID)
 			}
 		}
 	}
-
 	return highDiskUsageHosts, nil
 }
 
@@ -137,16 +135,6 @@ func main() {
 	// 	fmt.Println(host)
 	// }
 
-	highDiskUsageHosts, err := findHighDiskUsageHosts(clusterName)
-	if err != nil {
-		log.Fatalf("Error finding hosts with high disk usage: %v", err)
-	}
-
-	fmt.Println("\nHosts with more than 85% disk usage:")
-	for _, host := range highDiskUsageHosts {
-		fmt.Println(host)
-	}
-
 	// Commented out termination logic
 	// if len(drainingHosts) > 0 {
 	// 	fmt.Println("Terminating the following instances:")
@@ -162,4 +150,15 @@ func main() {
 	// } else {
 	// 	fmt.Println("No instances to terminate")
 	// }
+
+	highDiskUsageHosts, err := findHighDiskUsageHosts(clusterName)
+	if err != nil {
+		log.Fatalf("Error finding hosts with high disk usage: %v", err)
+	}
+
+	fmt.Println("\nHosts with more than 85% disk usage:")
+	for _, host := range highDiskUsageHosts {
+		fmt.Println(host)
+	}
+
 }
