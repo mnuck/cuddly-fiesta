@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/api/v1/datadog"
@@ -71,32 +72,6 @@ func terminateEC2Instances(instanceIDs []string) error {
 }
 
 func findHighDiskUsageHosts(clusterName string) ([]string, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		return nil, fmt.Errorf("unable to load SDK config: %v", err)
-	}
-
-	ecsClient := ecs.NewFromConfig(cfg)
-
-	// List container instances in the cluster
-	listInput := &ecs.ListContainerInstancesInput{
-		Cluster: &clusterName,
-	}
-	listResp, err := ecsClient.ListContainerInstances(context.TODO(), listInput)
-	if err != nil {
-		return nil, fmt.Errorf("error listing container instances: %v", err)
-	}
-
-	// Describe container instances to get EC2 instance IDs
-	describeInput := &ecs.DescribeContainerInstancesInput{
-		Cluster:            &clusterName,
-		ContainerInstances: listResp.ContainerInstanceArns,
-	}
-	describeResp, err := ecsClient.DescribeContainerInstances(context.TODO(), describeInput)
-	if err != nil {
-		return nil, fmt.Errorf("error describing container instances: %v", err)
-	}
-
 	// Initialize the Datadog client
 	ctx := context.WithValue(
 		context.Background(),
@@ -113,27 +88,35 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 	configuration := datadog.NewConfiguration()
 	apiClient := datadog.NewAPIClient(configuration)
 
+	// Construct the query for all hosts in the cluster
+	query := fmt.Sprintf("max:system.disk.in_use{account_name:production,ecs_cluster:%s} by {host}", clusterName)
+	from := time.Now().Add(-5 * time.Minute).Unix()
+	to := time.Now().Unix()
+
+	// Query Datadog for metrics
+	resp, r, err := apiClient.MetricsApi.QueryMetrics(ctx, from, to, query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying Datadog metrics: %v", err)
+	}
+	if r.StatusCode != 200 {
+		return nil, fmt.Errorf("received non-200 response from Datadog: %d", r.StatusCode)
+	}
+
 	var highDiskUsageHosts []string
-	for _, instance := range describeResp.ContainerInstances {
-		// Get disk usage metric for the instance from Datadog
-		query := fmt.Sprintf("max:system.disk.in_use{host:%s}", *instance.Ec2InstanceId)
-		from := time.Now().Add(-5 * time.Minute).Unix()
-		to := time.Now().Unix()
-
-		resp, r, err := apiClient.MetricsApi.QueryMetrics(ctx, from, to, query)
-		if err != nil {
-			return nil, fmt.Errorf("error querying Datadog metrics: %v", err)
-		}
-		if r.StatusCode != 200 {
-			return nil, fmt.Errorf("received non-200 response from Datadog: %d", r.StatusCode)
-		}
-
-		// Check if disk usage is over 85%
-		if len(resp.Series) > 0 && len(resp.Series[0].Pointlist) > 0 {
-			latestPoint := resp.Series[0].Pointlist[len(resp.Series[0].Pointlist)-1]
-			fmt.Printf("%v %v\n", *instance.Ec2InstanceId, *latestPoint[1])
+	for _, series := range resp.Series {
+		if len(series.Pointlist) > 0 {
+			latestPoint := series.Pointlist[len(series.Pointlist)-1]
+			hostTags := series.Scope
+			var hostID string
+			for _, tag := range hostTags {
+				if strings.HasPrefix(tag, "host:") {
+					hostID = strings.TrimPrefix(tag, "host:")
+					break
+				}
+			}
+			fmt.Printf("%v %v\n", hostID, *latestPoint[1])
 			if *latestPoint[1] > 0.85 {
-				highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
+				highDiskUsageHosts = append(highDiskUsageHosts, hostID)
 			}
 		}
 	}
