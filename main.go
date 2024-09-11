@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 )
 
 func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
@@ -103,18 +103,20 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 		datadog.ContextAPIKeys,
 		map[string]datadog.APIKey{
 			"apiKeyAuth": {
-				Key: "YOUR_DATADOG_API_KEY",
+				Key: os.Getenv("DD_CLIENT_API_KEY"),
+			},
+			"appKeyAuth": {
+				Key: os.Getenv("DD_CLIENT_APP_KEY"),
 			},
 		},
 	)
-
 	configuration := datadog.NewConfiguration()
 	apiClient := datadog.NewAPIClient(configuration)
 
 	var highDiskUsageHosts []string
 	for _, instance := range describeResp.ContainerInstances {
 		// Get disk usage metric for the instance from Datadog
-		query := fmt.Sprintf("avg:system.disk.in_use{host:%s}", *instance.Ec2InstanceId)
+		query := fmt.Sprintf("max:system.disk.in_use{host:%s}", *instance.Ec2InstanceId)
 		from := time.Now().Add(-5 * time.Minute).Unix()
 		to := time.Now().Unix()
 
@@ -129,7 +131,7 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 		// Check if disk usage is over 85%
 		if len(resp.Series) > 0 && len(resp.Series[0].Pointlist) > 0 {
 			latestPoint := resp.Series[0].Pointlist[len(resp.Series[0].Pointlist)-1]
-			if latestPoint[1] > 0.85 {
+			if *latestPoint[1] > 0.85 {
 				highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
 			}
 		}
