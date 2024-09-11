@@ -106,7 +106,7 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 	for _, series := range resp.Series {
 		if len(series.Pointlist) > 0 {
 			latestPoint := series.Pointlist[len(series.Pointlist)-1]
-			hostTags := *series.Scope
+			hostTags := strings.Split(*series.Scope, ",")
 			var hostID string
 			for _, tag := range hostTags {
 				if strings.HasPrefix(tag, "host:") {
@@ -114,7 +114,7 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 					break
 				}
 			}
-			fmt.Printf("%v\n", hostTags)
+			fmt.Printf("Host tags: %v\n", hostTags)
 			if *latestPoint[1] > 0.85 {
 				highDiskUsageHosts = append(highDiskUsageHosts, hostID)
 			}
