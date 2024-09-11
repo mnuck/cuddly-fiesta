@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 )
 
 func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
@@ -75,7 +78,7 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 	}
 
 	ecsClient := ecs.NewFromConfig(cfg)
-	ec2Client := ec2.NewFromConfig(cfg)
+	// ec2Client := ec2.NewFromConfig(cfg)
 	cwClient := cloudwatch.NewFromConfig(cfg)
 
 	// List container instances in the cluster
@@ -119,8 +122,9 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 			return nil, fmt.Errorf("error getting metric statistics: %v", err)
 		}
 
+		// highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
 		// Check if disk usage is over 85%
-		if len(metricResp.Datapoints) > 0 && *metricResp.Datapoints[0].Maximum > 85.0 {
+		if len(metricResp.Datapoints) > 0 && *metricResp.Datapoints[0].Maximum > 45.0 {
 			highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
 		}
 	}
@@ -130,16 +134,16 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 
 func main() {
 	clusterName := "core-production"
-	
-	drainingHosts, err := findDrainingHostsWithFewTasks(clusterName)
-	if err != nil {
-		log.Fatalf("Error finding draining hosts: %v", err)
-	}
 
-	fmt.Println("Draining hosts with fewer than 3 running tasks:")
-	for _, host := range drainingHosts {
-		fmt.Println(host)
-	}
+	// drainingHosts, err := findDrainingHostsWithFewTasks(clusterName)
+	// if err != nil {
+	// 	log.Fatalf("Error finding draining hosts: %v", err)
+	// }
+
+	// fmt.Println("Draining hosts with fewer than 3 running tasks:")
+	// for _, host := range drainingHosts {
+	// 	fmt.Println(host)
+	// }
 
 	highDiskUsageHosts, err := findHighDiskUsageHosts(clusterName)
 	if err != nil {
