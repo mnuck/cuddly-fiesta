@@ -7,7 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
@@ -39,7 +38,7 @@ func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
 
 	var drainingHosts []string
 	for _, instance := range describeResp.ContainerInstances {
-		if instance.Status == types.ContainerInstanceStatusDraining && instance.RunningTasksCount < 3 {
+		if instance.Status != nil && *instance.Status == "DRAINING" && instance.RunningTasksCount < 3 {
 			drainingHosts = append(drainingHosts, *instance.Ec2InstanceId)
 		}
 	}
@@ -48,7 +47,7 @@ func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
 }
 
 func main() {
-	clusterName := "your-cluster-name"
+	clusterName := "core-production"
 	drainingHosts, err := findDrainingHostsWithFewTasks(clusterName)
 	if err != nil {
 		log.Fatalf("Error finding draining hosts: %v", err)
