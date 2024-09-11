@@ -195,16 +195,23 @@ func terminateDrainingHostsWithFewTasks(clusterName string) error {
 
 func main() {
 	clusterName := "core-production"
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
 
-	err := drainHighDiskUsageHosts(clusterName)
-	if err != nil {
-		fmt.Printf("Error draining high disk usage hosts: %v\n", err)
-		os.Exit(1)
-	}
+	for {
+		fmt.Println("Running maintenance tasks...")
 
-	err = terminateDrainingHostsWithFewTasks(clusterName)
-	if err != nil {
-		fmt.Printf("Error terminating draining hosts with few tasks: %v\n", err)
-		os.Exit(1)
+		err := drainHighDiskUsageHosts(clusterName)
+		if err != nil {
+			fmt.Printf("Error draining high disk usage hosts: %v\n", err)
+		}
+
+		err = terminateDrainingHostsWithFewTasks(clusterName)
+		if err != nil {
+			fmt.Printf("Error terminating draining hosts with few tasks: %v\n", err)
+		}
+
+		fmt.Println("Maintenance tasks completed. Waiting for next cycle...")
+		<-ticker.C
 	}
 }
