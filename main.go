@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
@@ -66,6 +67,30 @@ func terminateEC2Instances(instanceIDs []string) error {
 	_, err = client.TerminateInstances(context.TODO(), input)
 	if err != nil {
 		return fmt.Errorf("error terminating instances: %v", err)
+	}
+
+	return nil
+}
+
+func putInstancesInDrainingState(clusterName string, instanceIDs []string) error {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		return fmt.Errorf("unable to load SDK config: %v", err)
+	}
+
+	client := ecs.NewFromConfig(cfg)
+
+	for _, instanceID := range instanceIDs {
+		input := &ecs.UpdateContainerInstancesStateInput{
+			Cluster:            &clusterName,
+			ContainerInstances: []string{instanceID},
+			Status:             ecs.ContainerInstanceStatusDraining,
+		}
+
+		_, err := client.UpdateContainerInstancesState(context.TODO(), input)
+		if err != nil {
+			return fmt.Errorf("error putting instance %s in DRAINING state: %v", instanceID, err)
+		}
 	}
 
 	return nil
