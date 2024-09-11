@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
@@ -84,7 +82,7 @@ func putInstancesInDrainingState(clusterName string, instanceIDs []string) error
 		input := &ecs.UpdateContainerInstancesStateInput{
 			Cluster:            &clusterName,
 			ContainerInstances: []string{instanceID},
-			Status:             ecs.ContainerInstanceStatusDraining,
+			Status:             "DRAINING",
 		}
 
 		_, err := client.UpdateContainerInstancesState(context.TODO(), input)
@@ -149,41 +147,5 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 
 func main() {
 	clusterName := "core-production"
-
-	// drainingHosts, err := findDrainingHostsWithFewTasks(clusterName)
-	// if err != nil {
-	// 	log.Fatalf("Error finding draining hosts: %v", err)
-	// }
-
-	// fmt.Println("Draining hosts with fewer than 3 running tasks:")
-	// for _, host := range drainingHosts {
-	// 	fmt.Println(host)
-	// }
-
-	// Commented out termination logic
-	// if len(drainingHosts) > 0 {
-	// 	fmt.Println("Terminating the following instances:")
-	// 	for _, host := range drainingHosts {
-	// 		fmt.Println(host)
-	// 	}
-
-	// 	err = terminateEC2Instances(drainingHosts)
-	// 	if err != nil {
-	// 		log.Fatalf("Error terminating instances: %v", err)
-	// 	}
-	// 	fmt.Println("Instances terminated successfully")
-	// } else {
-	// 	fmt.Println("No instances to terminate")
-	// }
-
-	highDiskUsageHosts, err := findHighDiskUsageHosts(clusterName)
-	if err != nil {
-		log.Fatalf("Error finding hosts with high disk usage: %v", err)
-	}
-
-	fmt.Println("\nHosts with more than 85% disk usage:")
-	for _, host := range highDiskUsageHosts {
-		fmt.Println(host)
-	}
 
 }
