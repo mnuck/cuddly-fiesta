@@ -8,10 +8,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 )
 
 func findDrainingHostsWithFewTasks(clusterName string) ([]string, error) {
@@ -78,8 +77,6 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 	}
 
 	ecsClient := ecs.NewFromConfig(cfg)
-	// ec2Client := ec2.NewFromConfig(cfg)
-	cwClient := cloudwatch.NewFromConfig(cfg)
 
 	// List container instances in the cluster
 	listInput := &ecs.ListContainerInstancesInput{
@@ -100,32 +97,41 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 		return nil, fmt.Errorf("error describing container instances: %v", err)
 	}
 
+	// Initialize the Datadog client
+	ctx := context.WithValue(
+		context.Background(),
+		datadog.ContextAPIKeys,
+		map[string]datadog.APIKey{
+			"apiKeyAuth": {
+				Key: "YOUR_DATADOG_API_KEY",
+			},
+		},
+	)
+
+	configuration := datadog.NewConfiguration()
+	apiClient := datadog.NewAPIClient(configuration)
+
 	var highDiskUsageHosts []string
 	for _, instance := range describeResp.ContainerInstances {
-		// Get disk usage metric for the instance
-		metricInput := &cloudwatch.GetMetricStatisticsInput{
-			Namespace:  aws.String("AWS/EC2"),
-			MetricName: aws.String("DiskSpaceUtilization"),
-			Dimensions: []types.Dimension{
-				{
-					Name:  aws.String("InstanceId"),
-					Value: instance.Ec2InstanceId,
-				},
-			},
-			StartTime:  aws.Time(time.Now().Add(-5 * time.Minute)),
-			EndTime:    aws.Time(time.Now()),
-			Period:     aws.Int32(300),
-			Statistics: []types.Statistic{types.StatisticMaximum},
-		}
-		metricResp, err := cwClient.GetMetricStatistics(context.TODO(), metricInput)
+		// Get disk usage metric for the instance from Datadog
+		query := fmt.Sprintf("avg:system.disk.in_use{host:%s}", *instance.Ec2InstanceId)
+		from := time.Now().Add(-5 * time.Minute).Unix()
+		to := time.Now().Unix()
+
+		resp, r, err := apiClient.MetricsApi.QueryMetrics(ctx, from, to, query)
 		if err != nil {
-			return nil, fmt.Errorf("error getting metric statistics: %v", err)
+			return nil, fmt.Errorf("error querying Datadog metrics: %v", err)
+		}
+		if r.StatusCode != 200 {
+			return nil, fmt.Errorf("received non-200 response from Datadog: %d", r.StatusCode)
 		}
 
-		// highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
 		// Check if disk usage is over 85%
-		if len(metricResp.Datapoints) > 0 && *metricResp.Datapoints[0].Maximum > 45.0 {
-			highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
+		if len(resp.Series) > 0 && len(resp.Series[0].Pointlist) > 0 {
+			latestPoint := resp.Series[0].Pointlist[len(resp.Series[0].Pointlist)-1]
+			if latestPoint[1] > 0.85 {
+				highDiskUsageHosts = append(highDiskUsageHosts, *instance.Ec2InstanceId)
+			}
 		}
 	}
 
