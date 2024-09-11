@@ -145,7 +145,36 @@ func findHighDiskUsageHosts(clusterName string) ([]string, error) {
 	return highDiskUsageHosts, nil
 }
 
+func drainHighDiskUsageHosts(clusterName string) error {
+	// Find hosts with high disk usage
+	highDiskUsageHosts, err := findHighDiskUsageHosts(clusterName)
+	if err != nil {
+		return fmt.Errorf("error finding high disk usage hosts: %v", err)
+	}
+
+	if len(highDiskUsageHosts) == 0 {
+		fmt.Println("No hosts with high disk usage found.")
+		return nil
+	}
+
+	fmt.Printf("Found %d hosts with high disk usage: %v\n", len(highDiskUsageHosts), highDiskUsageHosts)
+
+	// Put these hosts in DRAINING state
+	err = putInstancesInDrainingState(clusterName, highDiskUsageHosts)
+	if err != nil {
+		return fmt.Errorf("error putting instances in DRAINING state: %v", err)
+	}
+
+	fmt.Printf("Successfully put %d hosts in DRAINING state.\n", len(highDiskUsageHosts))
+	return nil
+}
+
 func main() {
 	clusterName := "core-production"
 
+	err := drainHighDiskUsageHosts(clusterName)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 }
