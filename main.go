@@ -169,12 +169,42 @@ func drainHighDiskUsageHosts(clusterName string) error {
 	return nil
 }
 
+func terminateDrainingHostsWithFewTasks(clusterName string) error {
+	// Find draining hosts with few tasks
+	drainingHosts, err := findDrainingHostsWithFewTasks(clusterName)
+	if err != nil {
+		return fmt.Errorf("error finding draining hosts with few tasks: %v", err)
+	}
+
+	if len(drainingHosts) == 0 {
+		fmt.Println("No draining hosts with few tasks found.")
+		return nil
+	}
+
+	fmt.Printf("Found %d draining hosts with few tasks: %v\n", len(drainingHosts), drainingHosts)
+
+	// Terminate these hosts
+	err = terminateEC2Instances(drainingHosts)
+	if err != nil {
+		return fmt.Errorf("error terminating instances: %v", err)
+	}
+
+	fmt.Printf("Successfully terminated %d hosts.\n", len(drainingHosts))
+	return nil
+}
+
 func main() {
 	clusterName := "core-production"
 
 	err := drainHighDiskUsageHosts(clusterName)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Error draining high disk usage hosts: %v\n", err)
+		os.Exit(1)
+	}
+
+	err = terminateDrainingHostsWithFewTasks(clusterName)
+	if err != nil {
+		fmt.Printf("Error terminating draining hosts with few tasks: %v\n", err)
 		os.Exit(1)
 	}
 }
