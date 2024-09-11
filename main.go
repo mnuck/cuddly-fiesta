@@ -79,18 +79,18 @@ func main() {
 		fmt.Println(host)
 	}
 
-	if len(drainingHosts) > 0 {
-		fmt.Println("Terminating the following instances:")
-		for _, host := range drainingHosts {
-			fmt.Println(host)
-		}
+	// if len(drainingHosts) > 0 {
+	// 	fmt.Println("Terminating the following instances:")
+	// 	for _, host := range drainingHosts {
+	// 		fmt.Println(host)
+	// 	}
 
-		err = terminateEC2Instances(drainingHosts)
-		if err != nil {
-			log.Fatalf("Error terminating instances: %v", err)
-		}
-		fmt.Println("Instances terminated successfully")
-	} else {
-		fmt.Println("No instances to terminate")
-	}
+	// 	err = terminateEC2Instances(drainingHosts)
+	// 	if err != nil {
+	// 		log.Fatalf("Error terminating instances: %v", err)
+	// 	}
+	// 	fmt.Println("Instances terminated successfully")
+	// } else {
+	// 	fmt.Println("No instances to terminate")
+	// }
 }
